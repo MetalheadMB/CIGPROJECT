@@ -1,0 +1,27 @@
+# Render blueprint for the backend API.
+# In Render: New + → Blueprint → connect this repo. It reads this file.
+# You only need to fill DATABASE_URL, PUBLIC_URL and CLIENT_URL afterwards.
+services:
+  - type: web
+    name: cig-backend
+    runtime: node
+    rootDir: backend
+    plan: free
+    buildCommand: npm install
+    startCommand: npx prisma db push --accept-data-loss && node src/server.js
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: JWT_SECRET
+        generateValue: true   # Render generates a secure random value
+      - key: DATABASE_URL
+        sync: false           # paste your Neon connection string
+      - key: PUBLIC_URL
+        sync: false           # set to this service's onrender.com URL
+      - key: CLIENT_URL
+        sync: false           # set to your Vercel URL
+      - key: STORAGE_DRIVER
+        value: local
+      - key: AI_DRIVER
+        value: local
