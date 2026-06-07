@@ -2,7 +2,10 @@
 // Database: PostgreSQL (Neon)
 
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  // Pin engine targets so the build-time generated engine matches Render's
+  // runtime OpenSSL (fixes "Error opening a TLS connection: OpenSSL error").
+  binaryTargets = ["native", "debian-openssl-3.0.x", "debian-openssl-1.1.x"]
 }
 
 datasource db {
