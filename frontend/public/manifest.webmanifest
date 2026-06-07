@@ -1,0 +1,12 @@
+{
+  "name": "CIG Event & Media Platform",
+  "short_name": "CIG Media",
+  "description": "Upload, organize, discover and interact with event media.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0b0c10",
+  "theme_color": "#0b0c10",
+  "icons": [
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

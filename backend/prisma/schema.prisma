@@ -1,0 +1,264 @@
+// Event & Media Management Platform - Prisma schema
+// Database: PostgreSQL (Neon)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------- Enums ----------------
+
+enum Role {
+  ADMIN
+  PHOTOGRAPHER
+  CLUB_MEMBER
+  VIEWER
+}
+
+enum MediaType {
+  IMAGE
+  VIDEO
+}
+
+enum Visibility {
+  PUBLIC
+  PRIVATE
+}
+
+enum NotificationType {
+  LIKE
+  COMMENT
+  TAG
+  SHARE
+  FAVORITE
+  SYSTEM
+}
+
+// ---------------- Models ----------------
+
+model User {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  password      String
+  name          String
+  role          Role     @default(VIEWER)
+  clubName      String?
+  avatarUrl     String?
+  // Reference selfie face descriptor (128 floats) for personalized photo discovery
+  faceDescriptor Float[]  @default([])
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  events        Event[]        @relation("EventCreator")
+  albums        Album[]        @relation("AlbumCreator")
+  media         Media[]        @relation("MediaUploader")
+  likes         Like[]
+  comments      Comment[]
+  favorites     Favorite[]
+  shares        Share[]
+  // Notifications received vs. caused
+  notifications      Notification[] @relation("NotificationRecipient")
+  triggered          Notification[] @relation("NotificationActor")
+  // User-tagging ("tag friends")
+  taggedIn      MediaUserTag[] @relation("TaggedUser")
+  tagsCreated   MediaUserTag[] @relation("TaggerUser")
+}
+
+model Event {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  category    String?
+  clubName    String?
+  date        DateTime?
+  coverUrl    String?
+  visibility  Visibility @default(PUBLIC)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  createdById String
+  createdBy   User     @relation("EventCreator", fields: [createdById], references: [id], onDelete: Cascade)
+
+  albums      Album[]
+  media       Media[]
+
+  @@index([name])
+  @@index([date])
+  @@index([category])
+}
+
+model Album {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+
+  eventId     String
+  event       Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  createdById String
+  createdBy   User     @relation("AlbumCreator", fields: [createdById], references: [id], onDelete: Cascade)
+
+  media       Media[]
+
+  @@index([eventId])
+}
+
+model Media {
+  id           String     @id @default(cuid())
+  type         MediaType  @default(IMAGE)
+  url          String
+  thumbnailUrl String?
+  storageKey   String?    // key/path in the storage backend
+  originalName String?
+  mimeType     String?
+  fileSize     Int?
+  width        Int?
+  height       Int?
+  caption      String?
+  visibility   Visibility @default(PUBLIC)
+  createdAt    DateTime   @default(now())
+
+  eventId      String
+  event        Event      @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  albumId      String?
+  album        Album?     @relation(fields: [albumId], references: [id], onDelete: SetNull)
+  uploadedById String
+  uploadedBy   User       @relation("MediaUploader", fields: [uploadedById], references: [id], onDelete: Cascade)
+
+  tags         MediaTag[]
+  faces        FaceDescriptor[]
+  likes        Like[]
+  comments     Comment[]
+  favorites    Favorite[]
+  userTags     MediaUserTag[]
+  notifications Notification[]
+
+  @@index([eventId])
+  @@index([albumId])
+  @@index([visibility])
+  @@index([createdAt])
+}
+
+model Tag {
+  id    String     @id @default(cuid())
+  name  String     @unique
+  media MediaTag[]
+
+  @@index([name])
+}
+
+// Join: AI-generated / manual tags on media, with confidence
+model MediaTag {
+  mediaId    String
+  tagId      String
+  confidence Float   @default(1.0)
+  source     String  @default("ai") // "ai" | "manual"
+
+  media Media @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+  tag   Tag   @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([mediaId, tagId])
+  @@index([tagId])
+}
+
+// Face descriptors detected within a piece of media (for facial recognition search)
+model FaceDescriptor {
+  id          String  @id @default(cuid())
+  mediaId     String
+  descriptor  Float[] // 128-d face embedding
+  boundingBox Json?   // { x, y, width, height }
+  createdAt   DateTime @default(now())
+
+  media Media @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+
+  @@index([mediaId])
+}
+
+model Like {
+  userId    String
+  mediaId   String
+  createdAt DateTime @default(now())
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  media Media @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+
+  @@id([userId, mediaId])
+  @@index([mediaId])
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  text      String
+  createdAt DateTime @default(now())
+
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mediaId   String
+  media     Media    @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+
+  @@index([mediaId])
+}
+
+model Favorite {
+  userId    String
+  mediaId   String
+  createdAt DateTime @default(now())
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  media Media @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+
+  @@id([userId, mediaId])
+  @@index([mediaId])
+}
+
+// "Tag friends/users" in a photo
+model MediaUserTag {
+  id           String @id @default(cuid())
+  mediaId      String
+  taggedUserId String
+  taggedById   String
+  createdAt    DateTime @default(now())
+
+  media      Media @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+  taggedUser User  @relation("TaggedUser", fields: [taggedUserId], references: [id], onDelete: Cascade)
+  taggedBy   User  @relation("TaggerUser", fields: [taggedById], references: [id], onDelete: Cascade)
+
+  @@unique([mediaId, taggedUserId])
+  @@index([taggedUserId])
+}
+
+// Shareable links / QR tokens for media or events
+model Share {
+  id          String   @id @default(cuid())
+  token       String   @unique
+  mediaId     String?
+  eventId     String?
+  createdById String
+  createdAt   DateTime @default(now())
+
+  createdBy User @relation(fields: [createdById], references: [id], onDelete: Cascade)
+
+  @@index([token])
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  type      NotificationType
+  message   String
+  read      Boolean          @default(false)
+  createdAt DateTime         @default(now())
+
+  recipientId String
+  recipient   User   @relation("NotificationRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+  actorId     String?
+  actor       User?  @relation("NotificationActor", fields: [actorId], references: [id], onDelete: SetNull)
+  mediaId     String?
+  media       Media? @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+
+  @@index([recipientId])
+  @@index([read])
+}
