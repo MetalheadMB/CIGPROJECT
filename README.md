@@ -231,9 +231,7 @@ After `npm run db:seed`:
 | member@cig.dev | password123 | Club Member |
 | viewer@cig.dev | password123 | Viewer |
 
+> The **first** user to register on a fresh database is automatically promoted to Admin.
 ---
 
 ## Built with ❤️ - MITUL
-
-
-> The **first** user to register on a fresh database is automatically promoted to Admin.
